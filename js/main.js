@@ -27,19 +27,17 @@ class RecceTrip {
   init() {
     console.log('🚀 RecceTrip v9.0 - Avvio...');
     
-    // Step 1: Crea il GPSManager
-    // Questo è il "cervello" che gestisce GPS e Racebox
+    // PRIMA: Crea i componenti UI (così sono pronti a ricevere dati)
+    this.createComponents();
+    
+    // DOPO: Crea il GPSManager (che inizierà a inviare dati ai componenti già pronti)
     this.gpsManager = new GPSManager({
-      // Callbacks: quando il GPS ha nuovi dati, chiama queste funzioni
       onTripUpdate: (tripA, tripB) => this.handleTripUpdate(tripA, tripB),
       onSpeedUpdate: (speed) => this.handleSpeedUpdate(speed),
       onDebugUpdate: (debugData) => this.handleDebugUpdate(debugData),
       onRaceboxStatusChange: (connected) => this.handleRaceboxStatus(connected)
     });
-    
-    // Step 2: Crea i componenti UI
-    this.createComponents();
-    
+        
     // Step 3: Registra il Service Worker per funzionamento offline
     this.registerServiceWorker();
     
@@ -140,4 +138,5 @@ class RecceTrip {
 // Avvia l'app quando il DOM è pronto
 document.addEventListener('DOMContentLoaded', () => {
   window.recceTrip = new RecceTrip();
+
 });
