@@ -79,6 +79,7 @@ export class TripADisplay {
         line-height: 0.8;
         font-weight: bold;
         color: var(--highlight);
+        margin-top: 10vh;
         font-variant-numeric: tabular-nums;
       }
       
@@ -86,7 +87,7 @@ export class TripADisplay {
         font-size: 3vh;
         color: var(--text-dim);
         letter-spacing: 15px;
-        margin-top: 10px;
+        margin-top: 15px;
       }
       
       /* Last Reset: centro top bar */
@@ -199,3 +200,4 @@ export class TripADisplay {
   }
 
 }
+
