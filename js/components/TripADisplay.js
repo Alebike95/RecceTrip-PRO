@@ -115,11 +115,11 @@ export class TripADisplay {
       /* Responsive landscape */
       @media (orientation: landscape) {
         .trip-a-value {
-          font-size: 30vh !important;
+          font-size: 40vh !important;
         }
         
         .last-reset-value {
-          font-size: 30vh;
+          font-size: 40vh;
         }
       }
       
@@ -200,4 +200,5 @@ export class TripADisplay {
   }
 
 }
+
 
