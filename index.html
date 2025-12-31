@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#000000">
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icons/icon-192x192.png">
-    <title>Rally TripMaster v9.1 - Modular</title>
+    <title>Rally TripMaster - Modular</title>
     <style>
         /* 
         ========================================
@@ -48,8 +48,8 @@
         .top-bar {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
-            align-items: end;
-            padding: 10px 20px 20px 20px;
+            align-items: center;
+            padding: 0 20px;
             height: 50%;
             background-color: #080808;
             border-bottom: 2px solid #222;
@@ -67,6 +67,22 @@
                 height: 50%;
             }
         }
+        /* Version Tag */
+        .version-tag {
+    position: absolute;
+    bottom: 5px;
+    left: 8px;
+    font-size: 10px;
+    color: #ffffff;
+    opacity: 0.6;
+    z-index: 1000; /* Molto alto per essere sicuri */
+    font-family: monospace;
+    cursor: pointer;
+    pointer-events: auto; /* Deve ricevere il click! */
+    padding: 10px; /* Aumenta l'area di tocco anche se la scritta è piccola */
+    background: rgba(0,0,0,0.2); /* Un leggero sfondo per vederlo meglio */
+    border-radius: 4px;
+}
     </style>
 </head>
 <body>
@@ -94,6 +110,9 @@
     
     <!-- Debug Panel: overlay fullscreen -->
     <div id="debug-container"></div>
+
+    <!-- Version: overlay fullscreen -->
+    <div class="version-tag" onclick="forceUpdate()">v0.2 (Tap to Update)</div>
     
     <!--
     ========================================
@@ -102,7 +121,38 @@
     ========================================
     -->
     <script type="module" src="js/main.js"></script>
+
+    <!--
+    ========================================
+    VERSIONE E FORZA AGGIORNAMENTO
+    Permette di forzare l'aggiornamento dell'app
+    ========================================
+    -->
+
+    <script>
+  async function forceUpdate() {
+    if (confirm("Vuoi forzare l'aggiornamento e ricaricare l'app?")) {
+      try {
+        // 1. Trova tutti i Service Worker registrati e cancellali
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (let registration of registrations) {
+          await registration.unregister();
+        }
+        
+        // 2. Svuota tutte le cache salvate dal browser
+        const cacheNames = await caches.keys();
+        for (let name of cacheNames) {
+          await caches.delete(name);
+        }
+        
+        // 3. Ricarica la pagina ignorando la cache del browser
+        window.location.reload(true);
+      } catch (err) {
+        alert("Errore durante l'aggiornamento: " + err);
+        window.location.reload(true);
+      }
+    }
+  }
+</script>
 </body>
-
 </html>
-
