@@ -1,7 +1,7 @@
 // Service Worker per RecceTrip
 // Permette all'app di funzionare offline
 
-const CACHE_NAME = 'RecceTrip-PROv0.2';
+const CACHE_NAME = 'RecceTrip-PROv0.25';
 const urlsToCache = [
   './',
   './index.html',
@@ -77,5 +77,6 @@ self.addEventListener('fetch', event => {
   );
 
 });
+
 
 
