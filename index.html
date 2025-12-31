@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icons/icon-192x192.png">
+    <title>Rally TripMaster v9.0 - Modular</title>
+    <style>
+        /* 
+        ========================================
+        STILI GLOBALI 
+        Questi rimangono qui perché sono usati
+        da TUTTA l'app (colori, font, layout base)
+        ========================================
+        */
+        :root {
+            --bg-color: #000000;
+            --text-main: #00FF00;
+            --text-dim: #666666;
+            --highlight: #FFFFFF;
+            --alert: #FF0000;
+            --last-val: #FF3333;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 0;
+            height: 100dvh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        
+        /* Layout principale */
+        .top-bar {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            align-items: end;
+            padding: 10px 20px 20px 20px;
+            height: 35%;
+            background-color: #080808;
+            border-bottom: 2px solid #222;
+        }
+        
+        .main-content {
+            flex-grow: 1;
+            position: relative;
+            background-color: #000;
+        }
+        
+        /* Responsive landscape */
+        @media (orientation: landscape) {
+            .top-bar {
+                height: 30%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!--
+    ========================================
+    CONTAINER VUOTI
+    Ogni componente inietta qui il suo HTML
+    ========================================
+    -->
+    <div class="top-bar">
+        <!-- TripB: sinistra -->
+        <div id="tripB-container"></div>
+        
+        <!-- Last Reset: centro -->
+        <div id="last-reset-container"></div>
+        
+        <!-- Speed: destra -->
+        <div id="speed-container"></div>
+    </div>
+    
+    <div class="main-content">
+        <!-- TripA: numero gigante centrale -->
+        <div id="tripA-container"></div>
+    </div>
+    
+    <!-- Debug Panel: overlay fullscreen -->
+    <div id="debug-container"></div>
+    
+    <!--
+    ========================================
+    CARICAMENTO MODULI
+    type="module" permette di usare import/export
+    ========================================
+    -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
