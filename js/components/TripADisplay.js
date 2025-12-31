@@ -105,7 +105,7 @@ export class TripADisplay {
       }
       
       .last-reset-value {
-        font-size: 16vh;
+        font-size: 30vh;
         color: var(--last-val);
         font-weight: bold;
         line-height: 0.8;
@@ -114,11 +114,11 @@ export class TripADisplay {
       /* Responsive landscape */
       @media (orientation: landscape) {
         .trip-a-value {
-          font-size: 48vh !important;
+          font-size: 30vh !important;
         }
         
         .last-reset-value {
-          font-size: 20vh;
+          font-size: 30vh;
         }
       }
       
@@ -197,4 +197,5 @@ export class TripADisplay {
       valueElement.textContent = Math.floor(newValue);
     }
   }
+
 }
