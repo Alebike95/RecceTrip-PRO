@@ -44,9 +44,8 @@ export class DebugPanel {
       <!-- Panel (nascosto di default) -->
       <div class="debug-panel" id="debug-panel" style="display: none;">
         <h2 style="color:white; margin-bottom: 20px;">DIAGNOSTICA GPS</h2>
-        
         <div class="debug-row">
-          Fonte: <span id="dbg-source" style="color:yellow">${this.debugData.source}</span>
+        Fonte: <span id="dbg-source" style="color:yellow">${this.debugData.source}</span>
         </div>
         
         <div class="debug-row" id="racebox-battery-row" style="display:none;">
@@ -91,41 +90,38 @@ export class DebugPanel {
 
   getStyles() {
     return `
-      /* Bottone Info */
+      /* Bottone Info - Posizionato sotto il tasto MAP */
       .info-btn {
-        position: absolute;
+        position: fixed;
         bottom: 20px;
         right: 20px;
-        width: 45px;
-        height: 45px;
-        background: #111;
-        border: 1px solid #333;
+        width: 50px;
+        height: 50px;
+        background: rgba(30, 30, 30, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 50%;
         display: flex;
         justify-content: center;
         align-items: center;
-        color: #444;
-        font-size: 20px;
+        color: #FFFFFF;
+        font-size: 24px;
+        font-family: monospace;
         font-weight: bold;
         cursor: pointer;
-        z-index: 50;
-        transition: all 0.3s;
-      }
-      
-      .info-btn:active {
-        background: #222;
-        color: #666;
+        z-index: 10005; /* Molto alto per stare sopra a tutto */
+        box-shadow: 0 0 10px rgba(0,0,0,0.5);
       }
       
       /* Debug Panel */
       .debug-panel {
-        position: absolute;
+        position: fixed; /* Usiamo fixed per coprire tutto lo schermo */
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
         background: rgba(0,0,0,0.98);
-        z-index: 100;
+        z-index: 10000; /* Massimo livello */
+        display: flex;
         flex-direction: column;
         padding: 25px;
         overflow-y: auto;
@@ -133,24 +129,25 @@ export class DebugPanel {
       
       .debug-row {
         font-size: 0.95rem;
-        margin: 6px 0;
+        margin: 8px 0;
         border-bottom: 1px solid #333;
         width: 100%;
-        padding-bottom: 4px;
+        padding-bottom: 6px;
         font-family: monospace;
         color: #ccc;
       }
       
       /* Bottoni debug */
       .btn-debug {
-        margin-top: 10px;
-        padding: 15px;
+        margin-top: 15px;
+        padding: 18px;
         color: white;
         border: 1px solid #444;
         width: 100%;
         text-align: center;
         cursor: pointer;
         font-weight: bold;
+        border-radius: 8px;
         transition: all 0.2s;
       }
       
@@ -160,6 +157,7 @@ export class DebugPanel {
       
       .btn-racebox {
         background: #004400;
+        border-color: #00ff00;
       }
       
       .btn-racebox.connected {
@@ -175,30 +173,43 @@ export class DebugPanel {
       style.textContent = this.getStyles();
       document.head.appendChild(style);
     }
-
-    this.container.innerHTML = this.getTemplate();
+    if (this.container) {
+      this.container.innerHTML = this.getTemplate();
+    }
   }
 
   attachEvents() {
     // Bottone Info: toggle panel
-    document.getElementById('info-btn').addEventListener('click', () => {
-      this.toggle();
-    });
+    const infoBtn = document.getElementById('info-btn');
+    if (infoBtn) {
+        infoBtn.addEventListener('click', () => {
+          this.toggle();
+        });
+    }
     
     // Bottone Chiudi
-    document.getElementById('close-debug-btn').addEventListener('click', () => {
-      this.toggle();
-    });
+    const closeBtn = document.getElementById('close-debug-btn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+          this.toggle();
+        });
+    }
     
     // Bottone Racebox
-    document.getElementById('racebox-btn').addEventListener('click', () => {
-      this.onToggleRacebox();
-    });
+    const rbBtn = document.getElementById('racebox-btn');
+    if (rbBtn) {
+        rbBtn.addEventListener('click', () => {
+          this.onToggleRacebox();
+        });
+    }
     
     // Bottone Fullscreen
-    document.getElementById('fullscreen-btn').addEventListener('click', () => {
-      this.onFullscreen();
-    });
+    const fsBtn = document.getElementById('fullscreen-btn');
+    if (fsBtn) {
+        fsBtn.addEventListener('click', () => {
+          this.onFullscreen();
+        });
+    }
   }
 
   /*
@@ -210,7 +221,9 @@ export class DebugPanel {
   toggle() {
     this.isOpen = !this.isOpen;
     const panel = document.getElementById('debug-panel');
-    panel.style.display = this.isOpen ? 'flex' : 'none';
+    if (panel) {
+        panel.style.display = this.isOpen ? 'flex' : 'none';
+  }
   }
 
   /*
@@ -274,15 +287,19 @@ export class DebugPanel {
     const batteryRow = document.getElementById('racebox-battery-row');
     
     if (connected) {
-      btn.textContent = '✅ RACEBOX CONNESSO';
-      btn.classList.add('connected');
+    if (btn) {
+          btn.textContent = '✅ RACEBOX CONNESSO';
+          btn.classList.add('connected');
+      }
       if (batteryRow) batteryRow.style.display = 'block';
       
       // Aggiorna source
       this.updateDebugInfo({ source: 'RaceBox Mini' });
     } else {
-      btn.textContent = '🔗 CONNETTI RACEBOX';
-      btn.classList.remove('connected');
+      if (btn) {
+          btn.textContent = '🔗 CONNETTI RACEBOX';
+          btn.classList.remove('connected');
+    }
       if (batteryRow) batteryRow.style.display = 'none';
       
       // Aggiorna source
