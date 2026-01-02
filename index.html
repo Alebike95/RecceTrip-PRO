@@ -7,27 +7,21 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icons/icon-192x192.png">
     <title>Rally TripMaster - Modular</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+
     <style>
-        /* 
-        ========================================
-        STILI GLOBALI 
-        Questi rimangono qui perché sono usati
-        da TUTTA l'app (colori, font, layout base)
-        ========================================
-        */
         :root {
             --bg-color: #000000;
             --text-main: #00FF00;
             --text-dim: #666666;
             --highlight: #FFFFFF;
             --alert: #FF0000;
-            --last-val: #FF3333;
+            --last-val: #FF3333; /* Rosso per il LAST */
         }
-        
-        * {
-            box-sizing: border-box;
-        }
-        
+
+        * { box-sizing: border-box; }
+
         body {
             background-color: var(--bg-color);
             color: var(--text-main);
@@ -43,116 +37,89 @@
             -webkit-user-select: none;
             touch-action: manipulation;
         }
-        
-        /* Layout principale */
+
+        /* Layout Strutturale */
         .top-bar {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
             align-items: center;
             padding: 0 20px;
-            height: 50%;
+            height: 50dvh;
             background-color: #080808;
             border-bottom: 2px solid #222;
         }
-        
+
         .main-content {
             flex-grow: 1;
             position: relative;
+            height: 50dvh;
             background-color: #000;
         }
-        
-        /* Responsive landscape */
+
+         /* Responsive landscape */
         @media (orientation: landscape) {
             .top-bar {
                 height: 50%;
             }
         }
-        /* Version Tag */
+
+        /* Container per i componenti (verranno riempiti dai JS) */
+        #debug-container { position: fixed; top: 0; left: 0; z-index: 10000; }
+
         .version-tag {
-    position: absolute;
-    bottom: 5px;
-    left: 8px;
-    font-size: 10px;
-    color: #ffffff;
-    opacity: 0.6;
-    z-index: 1000; /* Molto alto per essere sicuri */
-    font-family: monospace;
-    cursor: pointer;
-    pointer-events: auto; /* Deve ricevere il click! */
-    padding: 10px; /* Aumenta l'area di tocco anche se la scritta è piccola */
-    background: rgba(0,0,0,0.2); /* Un leggero sfondo per vederlo meglio */
-    border-radius: 4px;
-}
+            position: absolute;
+            bottom: 5px;
+            left: 8px;
+            font-size: 10px;
+            color: #ffffff;
+            opacity: 0.5;
+            z-index: 1000;
+            font-family: monospace;
+            cursor: pointer;
+            pointer-events: auto;
+            padding: 5px;
+        }
+
+        .my-label {
+            background: rgba(0,0,0,0.8); border: 1px solid #00ff00;
+            color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 4px;
+        }
     </style>
 </head>
 <body>
-    <!--
-    ========================================
-    CONTAINER VUOTI
-    Ogni componente inietta qui il suo HTML
-    ========================================
-    -->
+
     <div class="top-bar">
-        <!-- TripB: sinistra -->
         <div id="tripB-container"></div>
-        
-        <!-- Last Reset: centro -->
         <div id="last-reset-container"></div>
-        
-        <!-- Speed: destra -->
         <div id="speed-container"></div>
     </div>
-    
+  
     <div class="main-content">
-        <!-- TripA: numero gigante centrale -->
         <div id="tripA-container"></div>
+        
+        <div id="status-panel-root"></div>
+
+        <div id="map-panel-root"></div>
     </div>
     
-    <!-- Debug Panel: overlay fullscreen -->
     <div id="debug-container"></div>
-
-    <!-- Version: overlay fullscreen -->
-    <div class="version-tag" onclick="forceUpdate()">v0.2 (Tap to Update)</div>
+    <div class="version-tag" onclick="forceUpdate()">v1.0 (Tap to Update)</div>
     
-    <!--
-    ========================================
-    CARICAMENTO MODULI
-    type="module" permette di usare import/export
-    ========================================
-    -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script type="module" src="js/main.js"></script>
 
-    <!--
-    ========================================
-    VERSIONE E FORZA AGGIORNAMENTO
-    Permette di forzare l'aggiornamento dell'app
-    ========================================
-    -->
-
     <script>
-  async function forceUpdate() {
-    if (confirm("Vuoi forzare l'aggiornamento e ricaricare l'app?")) {
-      try {
-        // 1. Trova tutti i Service Worker registrati e cancellali
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (let registration of registrations) {
-          await registration.unregister();
+      async function forceUpdate() {
+        if (confirm("Forzare aggiornamento?")) {
+          try {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (let r of regs) { await r.unregister(); }
+            const keys = await caches.keys();
+            for (let k of keys) { await caches.delete(k); }
+            window.location.reload(true);
+          } catch (e) { window.location.reload(true); }
         }
-        
-        // 2. Svuota tutte le cache salvate dal browser
-        const cacheNames = await caches.keys();
-        for (let name of cacheNames) {
-          await caches.delete(name);
-        }
-        
-        // 3. Ricarica la pagina ignorando la cache del browser
-        window.location.reload(true);
-      } catch (err) {
-        alert("Errore durante l'aggiornamento: " + err);
-        window.location.reload(true);
       }
-    }
-  }
-</script>
+    </script>
 </body>
 </html>
