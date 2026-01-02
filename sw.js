@@ -1,7 +1,7 @@
 // Service Worker per RecceTrip
 // Permette all'app di funzionare offline
 
-const CACHE_NAME = 'RecceTrip-PROv0.25';
+const CACHE_NAME = 'RecceTrip-PROv0.26';  // ⬅️ CAMBIA VERSIONE per forzare aggiornamento
 const urlsToCache = [
   './',
   './index.html',
@@ -11,6 +11,8 @@ const urlsToCache = [
   './js/components/TripBDisplay.js',
   './js/components/SpeedDisplay.js',
   './js/components/DebugPanel.js',
+  './js/components/StatusPanel.js',      // ⬅️ AGGIUNTO
+  './js/components/MapPanel.js',         // ⬅️ AGGIUNTO
   './js/services/GPSManager.js'
 ];
 
@@ -77,6 +79,3 @@ self.addEventListener('fetch', event => {
   );
 
 });
-
-
-
