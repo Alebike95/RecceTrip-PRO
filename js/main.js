@@ -2,11 +2,6 @@
 ========================================
 MAIN.JS - L'ORCHESTRATORE
 ========================================
-Questo file è il "direttore d'orchestra":
-- Importa tutti i componenti
-- Li crea e li collega tra loro
-- Gestisce il flusso di dati tra GPSManager e UI
-========================================
 */
 
 import { TripADisplay } from './components/TripADisplay.js';
@@ -14,95 +9,93 @@ import { TripBDisplay } from './components/TripBDisplay.js';
 import { SpeedDisplay } from './components/SpeedDisplay.js';
 import { DebugPanel } from './components/DebugPanel.js';
 import { GPSManager } from './services/GPSManager.js';
+import { StatusPanel } from './components/StatusPanel.js';
+import { MapPanel } from './components/MapPanel.js';
 
 class RecceTrip {
   constructor() {
-    // Questi sono i "pezzi" della nostra app
     this.components = {};
     this.gpsManager = null;
-    
     this.init();
   }
 
   init() {
     console.log('🚀 RecceTrip v9.0 - Avvio...');
-    
-    // PRIMA: Crea i componenti UI (così sono pronti a ricevere dati)
-    this.createComponents();
-    
-    // DOPO: Crea il GPSManager (che inizierà a inviare dati ai componenti già pronti)
+
+    // 1. Inizializziamo il GPSManager
+    // Se lastLat/lastLon sono null (simulazione off), ora il MapPanel è istruito per non crashare
     this.gpsManager = new GPSManager({
       onTripUpdate: (tripA, tripB) => this.handleTripUpdate(tripA, tripB),
       onSpeedUpdate: (speed) => this.handleSpeedUpdate(speed),
       onDebugUpdate: (debugData) => this.handleDebugUpdate(debugData),
       onRaceboxStatusChange: (connected) => this.handleRaceboxStatus(connected)
     });
+
+    // 2. Creiamo i componenti UI
+    this.createComponents();
         
-    // Step 3: Registra il Service Worker per funzionamento offline
     this.registerServiceWorker();
-    
-    // Step 4: Richiedi Wake Lock (schermo sempre acceso)
     this.requestWakeLock();
     
     console.log('✅ RecceTrip pronto!');
   }
 
   createComponents() {
-    // TripA: il numero gigante centrale
-    this.components.tripA = new TripADisplay('tripA-container', 'last-reset-container', {
-      onReset: () => this.gpsManager.resetTripA()
-    });
-    
-    // TripB: top-left con reset lungo
-    this.components.tripB = new TripBDisplay('tripB-container', {
-      onResetAll: () => this.gpsManager.resetAll()
-    });
-    
-    // Speed: top-right
-    this.components.speed = new SpeedDisplay('speed-container');
-    
-    // Debug Panel: diagnostica e Racebox
-    this.components.debug = new DebugPanel('debug-container', {
-      onToggleRacebox: () => this.gpsManager.toggleRacebox(),
-      onFullscreen: () => this.toggleFullscreen()
-    });
+    try {
+        // I componenti base
+        this.components.tripA = new TripADisplay('tripA-container', 'last-reset-container', {
+          onReset: () => this.gpsManager.resetTripA()
+        });
+        
+        this.components.tripB = new TripBDisplay('tripB-container', {
+          onResetAll: () => this.gpsManager.resetAll()
+        });
+        
+        this.components.speed = new SpeedDisplay('speed-container');
+        
+        this.components.debug = new DebugPanel('debug-container', {
+          onToggleRacebox: () => this.gpsManager.toggleRacebox(),
+          onFullscreen: () => this.toggleFullscreen()
+        });
+
+        this.components.status = new StatusPanel();
+        
+        // Inizializzazione MapPanel
+        // Usiamo il MapPanel con i controlli "null-safe" che abbiamo visto prima
+        this.components.map = new MapPanel(this.gpsManager);
+
+        console.log('✅ Tutti i componenti UI sono stati creati');
+    } catch (error) {
+        console.error('❌ ERRORE CRITICO durante la creazione dei componenti:', error);
+        // Questo alert ti dirà esattamente cosa è fallito se lo schermo resta nero
+        // alert("Errore inizializzazione: " + error.message);
+    }
   }
 
-  /*
-  ========================================
-  HANDLERS - Gestiscono i dati dal GPS
-  ========================================
-  Questi metodi vengono chiamati dal GPSManager
-  quando ha nuovi dati da mostrare
-  */
-
   handleTripUpdate(tripA, tripB) {
-    // Aggiorna i display con i nuovi valori
-    this.components.tripA.update(tripA);
-    this.components.tripB.update(tripB);
+    if (this.components.tripA) this.components.tripA.update(tripA);
+    if (this.components.tripB) this.components.tripB.update(tripB);
   }
 
   handleSpeedUpdate(speed) {
-    this.components.speed.update(speed);
+    if (this.components.speed) this.components.speed.update(speed);
   }
 
   handleDebugUpdate(debugData) {
-    this.components.debug.updateDebugInfo(debugData);
+    if (this.components.debug) this.components.debug.updateDebugInfo(debugData);
+    if (debugData.battery !== undefined && this.components.status) {
+      this.components.status.updateBattery('rbx', debugData.battery);
+    }
   }
 
   handleRaceboxStatus(connected) {
-    this.components.debug.updateRaceboxStatus(connected);
+    if (this.components.debug) this.components.debug.updateRaceboxStatus(connected);
+    if (this.components.status) this.components.status.updateStatus('rbx', connected);
   }
-
-  /*
-  ========================================
-  UTILITY FUNCTIONS
-  ========================================
-  */
 
   toggleFullscreen() {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
+      document.documentElement.requestFullscreen().catch(e => console.error(e));
     } else {
       document.exitFullscreen();
     }
@@ -111,32 +104,34 @@ class RecceTrip {
   registerServiceWorker() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('Service Worker registrato:', reg))
-        .catch(err => console.error('Errore Service Worker:', err));
+        .then(reg => console.log('Service Worker registrato'))
+        .catch(err => console.error('Errore SW:', err));
     }
   }
 
   async requestWakeLock() {
     try {
       if ('wakeLock' in navigator) {
-        const wakeLock = await navigator.wakeLock.request('screen');
-        console.log('Wake Lock attivo');
-        
-        // Re-richiedi wake lock se la pagina diventa visibile
+        let wakeLock = await navigator.wakeLock.request('screen');
         document.addEventListener('visibilitychange', async () => {
           if (document.visibilityState === 'visible') {
-            await navigator.wakeLock.request('screen');
+            wakeLock = await navigator.wakeLock.request('screen');
           }
         });
       }
     } catch (err) {
-      console.log('Wake Lock non disponibile:', err);
+      console.log('Wake Lock non disponibile');
     }
   }
 }
 
-// Avvia l'app quando il DOM è pronto
+// Funzione globale per il vecchio sistema o debug
+window.handleMapClick = function() {
+    if (window.recceTrip && window.recceTrip.components.map) {
+        window.recceTrip.components.map.openMap();
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   window.recceTrip = new RecceTrip();
-
 });
