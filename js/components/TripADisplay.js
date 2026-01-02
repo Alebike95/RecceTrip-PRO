@@ -51,7 +51,7 @@ export class TripADisplay {
     return `
       <div class="last-reset-group">
         <span class="last-reset-label">LAST</span>
-        <span class="last-reset-value">${this.lastResetValue || ''}</span>
+        <span class="last-reset-value">${this.lastResetValue || '0'}</span>
       </div>
     `;
   }
@@ -64,22 +64,24 @@ export class TripADisplay {
   */
   getStyles() {
     return `
-      /* TripA: numero centrale gigante */
+      /* TripA: contenitore che occupa tutto il 50% inferiore */
       .trip-a-display {
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        align-items: center;
+        justify-content: center; /* Centra verticalmente */
+        align-items: center;     /* Centra orizzontalmente */
         height: 100%;
+        width: 100%;
         cursor: pointer;
+        box-sizing: border-box;
       }
       
       .trip-a-value {
-        font-size: 30vh;
-        line-height: 0.8;
+        font-size: 35vh; /* Regolato per stare nel 50% di altezza */
+        line-height: 1;  /* Line-height 1 evita ritagli strani */
         font-weight: bold;
         color: var(--highlight);
-        margin-top: 10vh;
+        margin: 0;       /* RIMOSSO IL MARGIN TOP che spingeva tutto giù */
         font-variant-numeric: tabular-nums;
       }
       
@@ -87,43 +89,48 @@ export class TripADisplay {
         font-size: 3vh;
         color: var(--text-dim);
         letter-spacing: 15px;
-        margin-top: 15px;
+        margin-top: 5px; /* Spazio minimo tra numero e scritta */
       }
       
-      /* Last Reset: centro top bar */
+      /* Last Reset: sta nella top bar (50% superiore) */
       .last-reset-group {
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
+        height: 100%;
       }
       
       .last-reset-label {
         font-size: 2vh;
-        color: #400;
+        color: #666;
         font-weight: bold;
-        margin-bottom: 5px;
         text-transform: uppercase;
       }
       
       .last-reset-value {
-        font-size: 30vh;
-        color: var(--last-val);
+        font-size: 35vh; /* Uguale al Trip A per simmetria */
+        color: #ff0000;
         font-weight: bold;
-        line-height: 0.8;
+        line-height: 1;
       }
       
-      /* Responsive landscape */
+      /* Responsive landscape (Orizzontale) */
       @media (orientation: landscape) {
         .trip-a-value {
-          font-size: 48vh !important;
+          font-size: 40vh !important; /* Leggermente più grande ma non troppo */
         }
         
         .last-reset-value {
-          font-size: 48vh;
+          font-size: 40vh;
+        }
+
+        .trip-a-unit {
+          font-size: 4vh;
+          margin-top: 0;
         }
       }
       
-      /* Animazione flash al tap */
       .trip-a-display.flash {
         animation: flash-anim 0.2s;
       }
@@ -170,7 +177,7 @@ export class TripADisplay {
       
       // Aggiorna display last reset
       const lastResetElement = this.lastResetContainer.querySelector('.last-reset-value');
-      if (lastResetElement) {
+      if (lastResetElement) { 
         lastResetElement.textContent = this.lastResetValue;
       }
       
@@ -194,13 +201,6 @@ export class TripADisplay {
     
     // Aggiorna solo il numero, non tutto il componente
     const valueElement = this.container.querySelector('.trip-a-value');
-    if (valueElement) {
-      valueElement.textContent = Math.floor(newValue);
-    }
+    if (valueElement) { valueElement.textContent = Math.floor(newValue); }
   }
-
 }
-
-
-
-
