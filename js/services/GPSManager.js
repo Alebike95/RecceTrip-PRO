@@ -1,6 +1,6 @@
 /*
 ========================================
-GPS MANAGER
+GPS MANAGER - L'ORCHESTRATORE DATI
 ========================================
 Il "cervello" dell'app. Gestisce:
 - GPS interno (con interpolazione fluida)
@@ -8,7 +8,8 @@ Il "cervello" dell'app. Gestisce:
 - Calcolo distanze 3D
 - Parsing pacchetti Racebox
 - Rendering loop per fluidità GPS interno
-
+- SIMULATORE DI MOVIMENTO (per test PC)
+- REGISTRAZIONE TRACCE E WAYPOINT (Nuovo)
 EDUCATIVO: Questo è un "Service" - non ha UI,
 solo logica business. È il più complesso ma anche
 il più importante.
@@ -17,6 +18,12 @@ il più importante.
 
 export class GPSManager {
   constructor(callbacks) {
+    // --------------------------------------------------------
+    // INTERRUTTORE SIMULAZIONE: false = GPS reale
+    // --------------------------------------------------------
+    this.simulationActive = false; // ⬅️ Cambia qui per attivare/disattivare simulazione 
+    // --------------------------------------------------------
+
     // Callbacks per notificare i componenti UI
     this.onTripUpdate = callbacks.onTripUpdate;
     this.onSpeedUpdate = callbacks.onSpeedUpdate;
@@ -37,6 +44,15 @@ export class GPSManager {
     this.lastAlt = null;
     this.currentSpeed = 0;
     
+    // NUOVO: Flag per primo fix GPS
+    this.hasFirstFix = false;
+
+    // Stati per Mappa
+    this.isRecording = false; // Se stiamo registrando la traccia
+    this.trackPoints = []; // Array di coordinate [lat, lon]
+    this.waypoints = []; // Array di marcatori {lat, lon, label}
+     // -----------------------------
+    
     // Racebox State
     this.raceboxConnected = false;
     this.raceboxDevice = null;
@@ -50,8 +66,14 @@ export class GPSManager {
   }
 
   init() {
-    // Avvia GPS interno
-    this.startInternalGPS();
+    console.log('🚀 GPSManager init - Simulation:', this.simulationActive);
+    
+    if (this.simulationActive) {
+      this.startSimulation();
+    } else {
+      // Avvia GPS interno reale
+      this.startInternalGPS();
+    }
     
     // Avvia rendering loop (per fluidità GPS interno)
     this.startRenderLoop();
@@ -59,32 +81,94 @@ export class GPSManager {
 
   /*
   ========================================
-  GPS INTERNO
+  SIMULATORE DI MOVIMENTO (DEBUG)
+  ========================================
+  */
+  startSimulation() {
+    console.warn('⚠️ MODALITÀ SIMULAZIONE ATTIVA');
+    let fakeLat = 45.000000;
+    let fakeLon = 9.000000;
+    let fakeSpeedMs = 0;
+    
+    // IMPORTANTE: Setta subito hasFirstFix per la simulazione
+    this.hasFirstFix = true;
+    
+    setInterval(() => {
+      // Simula accelerazione e decelerazione ciclica (0-100 km/h)
+      const time = Date.now() / 5000;
+      fakeSpeedMs = (Math.sin(time) + 1.1) * 13.8; // 13.8 m/s = ~50km/h di media
+      
+      // Sposta leggermente le coordinate in base alla velocità
+      fakeLat += 0.00005; 
+      fakeLon += 0.00005;
+
+      // Inietta i dati nel sistema tramite handlePosition
+      this.handlePosition({
+        coords: {
+          latitude: fakeLat,
+          longitude: fakeLon,
+          altitude: 200,
+          speed: fakeSpeedMs,
+          accuracy: 1
+        },
+        timestamp: Date.now()
+      });
+    }, 1000); // Aggiornamento 1Hz come GPS standard
+  }
+
+  /*
+  ========================================
+  GPS INTERNO - FIXED
   ========================================
   */
   startInternalGPS() {
     if (!navigator.geolocation) {
-      console.error('Geolocation non supportata');
+      console.error('❌ Geolocation non supportata');
+      this.onDebugUpdate({ fixStatus: 'GPS non disponibile' });
       return;
     }
 
+    console.log('📡 Avvio GPS interno...');
+    
+    // Mostra subito che stiamo cercando il segnale
+    this.onDebugUpdate({ fixStatus: 'Ricerca satelliti...' });
+
     navigator.geolocation.watchPosition(
       (position) => {
-        // Solo se Racebox NON è connesso
         if (!this.raceboxConnected) {
+          // PRIMO FIX GPS
+          if (!this.hasFirstFix) {
+            this.hasFirstFix = true;
+            console.log('✅ Primo fix GPS ricevuto!');
+            this.onDebugUpdate({ fixStatus: 'GPS ATTIVO' });
+          }
+          
           this.handlePosition(position);
         }
       },
       (error) => {
         if (!this.raceboxConnected) {
-          this.onDebugUpdate({
-            fixStatus: `ERR: ${error.message}`
-          });
+          console.error('❌ Errore GPS:', error);
+          
+          let errorMsg = 'Errore GPS';
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMsg = 'Permesso GPS negato';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMsg = 'Segnale GPS non disponibile';
+              break;
+            case error.TIMEOUT:
+              errorMsg = 'Timeout GPS - Riprovo...';
+              break;
+          }
+          
+          this.onDebugUpdate({ fixStatus: errorMsg });
         }
       },
       {
         enableHighAccuracy: true,
-        timeout: 5000,
+        timeout: 10000,        // ⬅️ Aumentato a 10 secondi
         maximumAge: 0
       }
     );
@@ -96,54 +180,46 @@ export class GPSManager {
   ========================================
   */
   async toggleRacebox() {
-    // Se già connesso, disconnetti
     if (this.raceboxConnected) {
       await this.disconnectRacebox();
       return;
     }
 
-    // Altrimenti connetti
     try {
-      // Richiedi device Bluetooth
       this.raceboxDevice = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: 'RaceBox Mini' }],
         optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
       });
 
-      // Listener per disconnessione automatica
       this.raceboxDevice.addEventListener('gattserverdisconnected', () => {
         this.handleRaceboxDisconnect();
       });
 
-      // Connetti GATT
       const server = await this.raceboxDevice.gatt.connect();
       const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
       const tx = await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
 
-      // Avvia notifiche
       await tx.startNotifications();
       this.raceboxCharacteristic = tx;
       this.raceboxConnected = true;
+      
+      // IMPORTANTE: Setta hasFirstFix anche per Racebox
+      this.hasFirstFix = true;
 
-      // Reset posizione GPS (per evitare salti)
       this.lastLat = null;
       this.lastLon = null;
       this.lastAlt = null;
       
-      // Allinea valori visuali (per evitare interpolazioni strane)
       this.visTripA = this.tripA;
       this.visTripB = this.tripB;
 
-      // Notifica UI
       this.onRaceboxStatusChange(true);
 
-      // Listener dati Racebox
       tx.addEventListener('characteristicvaluechanged', (event) => {
         const data = new Uint8Array(event.target.value.buffer);
         const parsed = this.parseRaceBoxPacket(data);
         
         if (parsed) {
-          // Crea oggetto position-like per riusare handlePosition
           this.handlePosition({
             coords: {
               latitude: parsed.lat,
@@ -154,7 +230,6 @@ export class GPSManager {
             }
           });
           
-          // Aggiorna batteria
           this.onDebugUpdate({ battery: parsed.battery });
         }
       });
@@ -162,8 +237,8 @@ export class GPSManager {
       console.log('✅ Racebox connesso');
 
     } catch (error) {
+      console.error('❌ Errore Racebox:', error);
       alert('Errore connessione Racebox: ' + error.message);
-      console.error('Racebox error:', error);
     }
   }
 
@@ -183,14 +258,14 @@ export class GPSManager {
     this.raceboxConnected = false;
     this.raceboxDevice = null;
     this.raceboxCharacteristic = null;
+    this.hasFirstFix = false; // ⬅️ Reset anche questo
     
-    // Reset GPS state
     this.lastLat = null;
     this.lastLon = null;
     this.lastAlt = null;
     
-    // Notifica UI
     this.onRaceboxStatusChange(false);
+    this.onDebugUpdate({ fixStatus: 'Racebox disconnesso' });
     
     console.log('Racebox disconnesso');
   }
@@ -201,15 +276,13 @@ export class GPSManager {
   ========================================
   */
   parseRaceBoxPacket(data) {
-    // Verifica lunghezza minima
     if (data.length < 70) return null;
     
-    // Verifica header UBX
     if (data[0] !== 0xB5 || data[1] !== 0x62 || data[2] !== 0xFF || data[3] !== 0x01) {
       return null;
     }
     
-    const p = 6; // Offset payload
+    const p = 6;
     
     return {
       lon: this.i32(data, p + 24) * 1e-7,
@@ -220,30 +293,30 @@ export class GPSManager {
     };
   }
 
-  // Helper per leggere bytes
-  u8(data, offset) {
-    return data[offset];
-  }
-
+  u8(data, offset) { return data[offset]; }
+  
   u32(data, offset) {
     return data[offset] | (data[offset+1]<<8) | (data[offset+2]<<16) | (data[offset+3]<<24);
   }
-
-  i32(data, offset) {
-    return (this.u32(data, offset) << 0);
-  }
+  
+  i32(data, offset) { return (this.u32(data, offset) << 0); }
 
   /*
   ========================================
-  HANDLE POSITION
-  Gestisce dati GPS (sia interno che Racebox)
+  HANDLE POSITION - FIXED
   ========================================
   */
   handlePosition(position) {
+    // PROTEZIONE: Ignora dati GPS invalidi
     const crd = position.coords;
+    if (!crd || crd.latitude === null || crd.longitude === null) {
+      console.warn('⚠️ Posizione GPS invalida, ignoro');
+      return;
+    }
+    
     const now = Date.now();
 
-    // Calcola Hz (aggiornamenti al secondo)
+    // Calcola Hz
     this.updateTimestamps.push(now);
     this.updateTimestamps = this.updateTimestamps.filter(t => t > now - 2000);
     
@@ -253,7 +326,7 @@ export class GPSManager {
       hz = (this.updateTimestamps.length / dt).toFixed(1);
     }
 
-    // Aggiorna velocità IMMEDIATAMENTE (serve reattività, non fluidità)
+    // Aggiorna velocità IMMEDIATAMENTE
     this.currentSpeed = Math.max(0, (crd.speed || 0) * 3.6);
     this.onSpeedUpdate(this.currentSpeed);
 
@@ -262,10 +335,11 @@ export class GPSManager {
       hz: hz,
       speed: crd.speed || 0,
       altitude: crd.altitude,
-      fixStatus: 'FIX OK'
+      fixStatus: this.hasFirstFix ? 'FIX OK' : 'Primo fix...',
+      pts: this.trackPoints.length
     });
 
-    // Calcola distanza se abbiamo una posizione precedente
+    // CALCOLO DISTANZA - Solo se abbiamo una posizione precedente VALIDA
     if (this.lastLat !== null && this.lastLon !== null) {
       const dist2d = this.calculateDistance(
         this.lastLat,
@@ -282,23 +356,29 @@ export class GPSManager {
         distFinal = Math.sqrt(dist2d * dist2d + dAlt * dAlt);
       }
 
-      // Debug
       this.onDebugUpdate({ distance3d: distFinal });
 
-      // Aggiungi distanza solo se ci stiamo muovendo e la distanza è ragionevole
-      if (crd.speed > 0.1 && distFinal < 50) {
-        // Aggiorna valori REALI
+      // Aggiungi distanza solo se:
+      // 1. Ci stiamo muovendo (speed > 0.1 m/s = 0.36 km/h)
+      // 2. La distanza è ragionevole (< 50m tra update)
+      // 3. Abbiamo avuto il primo fix
+      if (this.hasFirstFix && crd.speed > 0.1 && distFinal < 50) {
         this.tripA += distFinal;
         this.tripB += distFinal;
 
-        // STRADA 1: RACEBOX (Aggiornamento diretto)
-        if (this.raceboxConnected) {
+        // Registrazione traccia
+        if (this.isRecording) {
+          this.trackPoints.push([crd.latitude, crd.longitude]);
+        }
+
+        // Aggiornamento UI
+        if (this.raceboxConnected || this.simulationActive) {
+          // Racebox/Simulazione: diretto
           this.visTripA = this.tripA;
           this.visTripB = this.tripB;
           this.updateUIImmediate();
         }
-        // STRADA 2: GPS Interno (Aggiornamento fluido nel renderLoop)
-        // Non facciamo nulla qui, il renderLoop farà l'interpolazione
+        // GPS interno: il renderLoop farà l'interpolazione
       }
     }
 
@@ -310,11 +390,11 @@ export class GPSManager {
 
   /*
   ========================================
-  CALCOLO DISTANZA (Formula Haversine)
+  CALCOLO DISTANZA (Haversine)
   ========================================
   */
   calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000; // Raggio Terra in metri
+    const R = 6371000;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     
@@ -329,18 +409,15 @@ export class GPSManager {
   /*
   ========================================
   RENDERING LOOP
-  Interpolazione fluida per GPS interno
-  Gira a 60 FPS
   ========================================
   */
   startRenderLoop() {
     const loop = () => {
-      // Solo se GPS interno (non Racebox)
-      if (!this.raceboxConnected) {
+      // Solo se GPS interno (non Racebox e non Simulazione)
+      if (!this.raceboxConnected && !this.simulationActive) {
         // Interpolazione TripA
         const diffA = this.tripA - this.visTripA;
         if (Math.abs(diffA) > 0.05) {
-          // Muovi del 10% verso il target (effetto smooth)
           this.visTripA += diffA * 0.1;
         } else {
           this.visTripA = this.tripA;
@@ -358,7 +435,6 @@ export class GPSManager {
         this.onTripUpdate(this.visTripA, this.visTripB);
       }
 
-      // Loop continuo
       requestAnimationFrame(loop);
     };
 
@@ -367,11 +443,10 @@ export class GPSManager {
 
   /*
   ========================================
-  UPDATE UI IMMEDIATE (Racebox)
+  UPDATE UI IMMEDIATE
   ========================================
   */
   updateUIImmediate() {
-    // Notifica UI con valori reali (no interpolazione)
     this.onTripUpdate(this.tripA, this.tripB);
   }
 
@@ -381,16 +456,44 @@ export class GPSManager {
   ========================================
   */
   resetTripA() {
+    // Salva waypoint prima di resettare
+    if (this.lastLat !== null && this.lastLon !== null && this.hasFirstFix) {
+      const frozenVal = this.tripA.toFixed(2);
+      this.waypoints.push({
+        lat: this.lastLat,
+        lon: this.lastLon,
+        label: frozenVal
+      });
+      console.log('📍 Waypoint salvato:', frozenVal);
+    }
+
     this.tripA = 0;
     this.visTripA = 0;
     this.updateUIImmediate();
   }
 
   resetAll() {
+    // Reset contatori
     this.tripA = 0;
     this.tripB = 0;
     this.visTripA = 0;
     this.visTripB = 0;
+
+    // --- NUOVO: LOGICA RESET TRACCIA ---
+    // Azzerare Trip B significa iniziare una nuova registrazione
+    this.trackPoints = [];
+    this.waypoints = [];
+    this.isRecording = true;
+    console.log("🚩 Registrazione Mappa Avviata");
+    // ------------------------------------
+    
+    console.log('🚩 Registrazione Mappa Avviata');
     this.updateUIImmediate();
+  }
+
+  // --- NUOVO: CONTROLLO REGISTRAZIONE ---
+  setRecording(status) {
+    this.isRecording = status;
+    console.log("Stato registrazione traccia:", status);
   }
 }
