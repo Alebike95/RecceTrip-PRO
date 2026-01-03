@@ -11,11 +11,13 @@ import { DebugPanel } from './components/DebugPanel.js';
 import { GPSManager } from './services/GPSManager.js';
 import { StatusPanel } from './components/StatusPanel.js';
 import { MapPanel } from './components/MapPanel.js';
+import { RemoteButtonManager } from './services/RemoteButtonManager.js'; // ⬅️ NUOVO IMPORT
 
 class RecceTrip {
   constructor() {
     this.components = {};
     this.gpsManager = null;
+    this.remoteButtonManager = null; // ⬅️ NUOVO STATO
     this.init();
   }
 
@@ -33,6 +35,26 @@ class RecceTrip {
 
     // 2. Creiamo i componenti UI
     this.createComponents();
+    
+    // 3. Inizializziamo il gestore del telecomando (dopo aver creato i componenti)
+    // ⬅️ NUOVA SEZIONE
+    this.remoteButtonManager = new RemoteButtonManager({
+      onResetA: () => {
+        // Usa il click del componente UI per avere l'effetto "Flash"
+        if (document.getElementById('trip-a-clickable')) {
+            document.getElementById('trip-a-clickable').click();
+        } else {
+            // Fallback se l'UI non è pronta
+            this.gpsManager.resetTripA();
+        }
+      },
+      onResetB: () => {
+        // Reset totale e avvio nuova registrazione
+        this.gpsManager.resetAll();
+        // Feedback in console
+        console.log("🎮 Reset Totale da Telecomando");
+      }
+    });
         
     this.registerServiceWorker();
     this.requestWakeLock();
